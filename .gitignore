@@ -1,0 +1,40 @@
+# Environment files and secrets
+.env
+.env.*
+*.env
+!.env.example
+!.env.*.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+
+# Dependencies
+node_modules/
+
+# Build output and caches
+.next/
+dist/
+coverage/
+.turbo/
+.cache/
+.output/
+.vercel/
+.swc/
+*.tsbuildinfo
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and local tooling state
+*.log
+.pnpm-debug.log*
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+debug.log
+lerna-debug.log
+yarn-error.log
+lock-warnings.txt
+.playwright-mcp/

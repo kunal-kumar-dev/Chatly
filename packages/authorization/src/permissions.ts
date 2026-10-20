@@ -1,0 +1,179 @@
+// Core permissions for Chatly RBAC
+// These are stored in DB but defined here for type safety and reference
+export const PERMISSIONS = {
+  // Workspace
+  WORKSPACE_MANAGE: 'workspace.manage',
+
+  // Teams
+  TEAM_MANAGE: 'team.manage',
+  TEAM_CREATE: 'team.create',
+
+  // Users
+  USER_CREATE: 'user.create',
+  USER_READ: 'user.read',
+  USER_UPDATE: 'user.update',
+  USER_DELETE: 'user.delete',
+  USER_MANAGE: 'user.manage',
+  USER_BAN: 'user.ban',
+  USER_UNBAN: 'user.unban',
+
+  // Roles
+  ROLE_CREATE: 'role.create',
+  ROLE_READ: 'role.read',
+  ROLE_UPDATE: 'role.update',
+  ROLE_DELETE: 'role.delete',
+  ROLE_MANAGE: 'role.manage',
+
+  // Channels
+  CHANNEL_CREATE: 'channel.create',
+  CHANNEL_READ: 'channel.read',
+  CHANNEL_UPDATE: 'channel.update',
+  CHANNEL_DELETE: 'channel.delete',
+  CHANNEL_INVITE: 'channel.invite',
+  CHANNEL_REMOVE_MEMBER: 'channel.remove_member',
+  CHANNEL_JOIN: 'channel.join',
+  CHANNEL_LEAVE: 'channel.leave',
+  CHANNEL_MANAGE: 'channel.manage',
+
+  // Messages
+  MESSAGE_SEND: 'message.send',
+  MESSAGE_READ: 'message.read',
+  MESSAGE_EDIT_OWN: 'message.edit_own',
+  MESSAGE_EDIT_ANY: 'message.edit_any',
+  MESSAGE_DELETE_OWN: 'message.delete_own',
+  MESSAGE_DELETE_ANY: 'message.delete_any',
+  MESSAGE_REPLY: 'message.reply',
+  MESSAGE_FORWARD: 'message.forward',
+  MESSAGE_PIN: 'message.pin',
+  MESSAGE_UNPIN: 'message.unpin',
+  MESSAGE_STAR: 'message.star',
+  MESSAGE_REACT: 'message.react',
+  MESSAGE_MENTION: 'message.mention',
+
+  // Files
+  FILE_UPLOAD: 'file.upload',
+  FILE_DOWNLOAD: 'file.download',
+  FILE_DELETE_OWN: 'file.delete_own',
+  FILE_DELETE_ANY: 'file.delete_any',
+
+  // Audit
+  AUDIT_VIEW: 'audit.view',
+  AUDIT_EXPORT: 'audit.export',
+
+  // Export
+  EXPORT_DATA: 'export.data',
+} as const;
+
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const SYSTEM_ROLES = {
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN: 'Admin',
+  MANAGER: 'Manager',
+  MEMBER: 'Member',
+  GUEST: 'Guest',
+} as const;
+
+export type SystemRole = (typeof SYSTEM_ROLES)[keyof typeof SYSTEM_ROLES];
+
+// Permission groups for easier role assignment
+export const PERMISSION_GROUPS = {
+  GUEST: [
+    PERMISSIONS.CHANNEL_READ,
+    PERMISSIONS.MESSAGE_READ,
+    PERMISSIONS.FILE_DOWNLOAD,
+  ],
+  MEMBER: [
+    PERMISSIONS.CHANNEL_READ,
+    PERMISSIONS.CHANNEL_JOIN,
+    PERMISSIONS.CHANNEL_LEAVE,
+    PERMISSIONS.MESSAGE_SEND,
+    PERMISSIONS.MESSAGE_READ,
+    PERMISSIONS.MESSAGE_EDIT_OWN,
+    PERMISSIONS.MESSAGE_DELETE_OWN,
+    PERMISSIONS.MESSAGE_REPLY,
+    PERMISSIONS.MESSAGE_FORWARD,
+    PERMISSIONS.MESSAGE_STAR,
+    PERMISSIONS.MESSAGE_REACT,
+    PERMISSIONS.MESSAGE_MENTION,
+    PERMISSIONS.FILE_UPLOAD,
+    PERMISSIONS.FILE_DOWNLOAD,
+    PERMISSIONS.FILE_DELETE_OWN,
+  ],
+  MANAGER: [
+    // All member permissions
+    ...[
+      PERMISSIONS.CHANNEL_READ,
+      PERMISSIONS.CHANNEL_JOIN,
+      PERMISSIONS.CHANNEL_LEAVE,
+      PERMISSIONS.MESSAGE_SEND,
+      PERMISSIONS.MESSAGE_READ,
+      PERMISSIONS.MESSAGE_EDIT_OWN,
+      PERMISSIONS.MESSAGE_DELETE_OWN,
+      PERMISSIONS.MESSAGE_REPLY,
+      PERMISSIONS.MESSAGE_FORWARD,
+      PERMISSIONS.MESSAGE_STAR,
+      PERMISSIONS.MESSAGE_REACT,
+      PERMISSIONS.MESSAGE_MENTION,
+      PERMISSIONS.FILE_UPLOAD,
+      PERMISSIONS.FILE_DOWNLOAD,
+      PERMISSIONS.FILE_DELETE_OWN,
+    ],
+    // Plus management
+    PERMISSIONS.CHANNEL_CREATE,
+    PERMISSIONS.CHANNEL_UPDATE,
+    PERMISSIONS.CHANNEL_INVITE,
+    PERMISSIONS.CHANNEL_REMOVE_MEMBER,
+    PERMISSIONS.CHANNEL_MANAGE,
+    PERMISSIONS.MESSAGE_EDIT_ANY,
+    PERMISSIONS.MESSAGE_DELETE_ANY,
+    PERMISSIONS.MESSAGE_PIN,
+    PERMISSIONS.MESSAGE_UNPIN,
+    PERMISSIONS.FILE_DELETE_ANY,
+    PERMISSIONS.USER_READ,
+  ],
+  ADMIN: [
+    // All manager permissions plus admin
+    ...[
+      PERMISSIONS.CHANNEL_READ,
+      PERMISSIONS.CHANNEL_JOIN,
+      PERMISSIONS.CHANNEL_LEAVE,
+      PERMISSIONS.MESSAGE_SEND,
+      PERMISSIONS.MESSAGE_READ,
+      PERMISSIONS.MESSAGE_EDIT_OWN,
+      PERMISSIONS.MESSAGE_DELETE_OWN,
+      PERMISSIONS.MESSAGE_REPLY,
+      PERMISSIONS.MESSAGE_FORWARD,
+      PERMISSIONS.MESSAGE_STAR,
+      PERMISSIONS.MESSAGE_REACT,
+      PERMISSIONS.MESSAGE_MENTION,
+      PERMISSIONS.FILE_UPLOAD,
+      PERMISSIONS.FILE_DOWNLOAD,
+      PERMISSIONS.FILE_DELETE_OWN,
+      PERMISSIONS.CHANNEL_CREATE,
+      PERMISSIONS.CHANNEL_UPDATE,
+      PERMISSIONS.CHANNEL_INVITE,
+      PERMISSIONS.CHANNEL_REMOVE_MEMBER,
+      PERMISSIONS.CHANNEL_MANAGE,
+      PERMISSIONS.MESSAGE_EDIT_ANY,
+      PERMISSIONS.MESSAGE_DELETE_ANY,
+      PERMISSIONS.MESSAGE_PIN,
+      PERMISSIONS.MESSAGE_UNPIN,
+      PERMISSIONS.FILE_DELETE_ANY,
+      PERMISSIONS.USER_READ,
+    ],
+    PERMISSIONS.USER_CREATE,
+    PERMISSIONS.USER_UPDATE,
+    PERMISSIONS.USER_DELETE,
+    PERMISSIONS.USER_MANAGE,
+    PERMISSIONS.USER_BAN,
+    PERMISSIONS.USER_UNBAN,
+    PERMISSIONS.WORKSPACE_MANAGE,
+    PERMISSIONS.TEAM_MANAGE,
+    PERMISSIONS.AUDIT_VIEW,
+  ],
+  SUPER_ADMIN: [
+    // All permissions
+    ...Object.values(PERMISSIONS),
+  ],
+};

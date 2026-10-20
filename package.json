@@ -1,0 +1,36 @@
+{
+  "name": "chatly",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Secure company team-chat application with RBAC",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @chatly/database prisma generate",
+    "db:migrate": "pnpm --filter @chatly/database prisma migrate dev",
+    "db:push": "pnpm --filter @chatly/database prisma db push",
+    "db:seed": "pnpm --filter @chatly/database prisma db seed",
+    "db:deploy": "pnpm --filter @chatly/database prisma migrate deploy",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.35",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
