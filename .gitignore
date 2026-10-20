@@ -38,3 +38,7 @@ lerna-debug.log
 yarn-error.log
 lock-warnings.txt
 .playwright-mcp/
+.logs/
+.docker/
+out/
+build/
