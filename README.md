@@ -1,161 +1,205 @@
 # Chatly
 
-A secure company team-chat application with role-based access control. The
-current MVP includes email/password authentication, workspace channels,
-persistent message history, and authenticated real-time chat. File sharing,
-direct messages, and server-side search remain planned work.
+**A focused team chat for work that moves forward.**
 
-## What works today
+Chatly is a workspace-based team messaging application. The current MVP
+includes account authentication, workspace channels, persistent messages,
+real-time channel updates, and server-side channel access checks.
 
-### Implemented
-- Email/password registration and sign-in, Argon2 password hashes, JWT access
-  tokens, rotating refresh tokens, session restore, and sign-out.
-- Seeded demo workspace, workspace membership, system roles, and server-side
-  permission guards.
-- Public workspace channels and access checks for private channels a user
-  already belongs to. Private-channel administration is not implemented.
-- Persistent channel messages, loading the latest 100 messages, and live
-  delivery to authenticated Socket.IO clients in the same channel.
-- Channel member list, channel details, in-channel filtering of the messages
-  already loaded, and channel links that open the selected channel.
-- PostgreSQL readiness endpoint at `/api/health/ready`.
+![Illustrative preview of the Chatly channel interface](docs/images/chatly-overview.svg)
 
-### Not implemented yet
-- Direct or group messages, private-channel creation and membership controls.
-- File uploads, server-side/full-history search, typing or online presence,
-  read receipts, notifications, and the admin UI.
-- Message editing/deletion, pagination beyond the latest 100 messages, and
-  other unlisted roadmap items.
+> The image above is an illustration of the implemented interface, not a
+> production screenshot. Chatly is under active development; feature status
+> and known limitations are listed below.
 
-The UI's message filter only searches messages currently loaded in the selected
-channel; it is not a server-side search. See the [roadmap](docs/roadmap.md) for
-planned work.
+## At a glance
 
-## Tech Stack
-- **Frontend**: Next.js 14+ (App Router), React, TypeScript, Tailwind CSS
-- **Backend**: NestJS, TypeScript, REST API + Socket.IO
-- **Database**: PostgreSQL with Prisma
-- **Redis and MinIO**: available in the development stack; presence, caching,
-  and file uploads are not integrated into the current MVP
-- **Monorepo**: pnpm workspaces
+| Area | Current implementation |
+| --- | --- |
+| Accounts | Email/password registration and sign-in, Argon2 password hashing |
+| Sessions | Short-lived JWT access tokens and rotating refresh tokens |
+| Workspaces | Demo workspace membership and seeded system roles |
+| Channels | Public channel listing; access checks for private channels a user is already in |
+| Messages | Persistent channel history, latest 100 messages, real-time delivery |
+| Discovery | Client-side filter over messages already loaded in the active channel |
+| Authorization | Server-side NestJS guards and database-backed permissions |
 
-## Quick Start
+## What works
 
-### Prerequisites
-- Node.js 18+
-- pnpm 8+
-- Docker with the Docker Compose plugin
+- Register and sign in with email and password.
+- Restore the browser session, refresh expired access tokens, and sign out.
+- Load workspace channels the signed-in user is allowed to access.
+- Read the latest 100 messages in a channel and send new messages.
+- Receive live messages from authenticated users in the same channel.
+- View channel members and details, filter the loaded messages, and copy a
+  channel link that opens the selected channel.
+- Check API availability at `/api/health` and PostgreSQL readiness at
+  `/api/health/ready`.
 
-### Setup
+### Current limitations
 
-1. Install dependencies:
+- Direct and group messages are not implemented.
+- Creating private channels and managing their membership are not implemented.
+- Search only filters the messages currently loaded in the selected channel;
+  it is not a server-side or full-history search.
+- Message history is limited to the latest 100 messages; pagination is not
+  implemented.
+- File uploads, presence, typing indicators, read receipts, notifications,
+  and the administration UI are not implemented.
+- Redis and MinIO run in the optional development stack but are not yet wired
+  into the MVP's messaging features.
+
+See the [roadmap](docs/roadmap.md) for planned work.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser["Chatly web app<br/>Next.js + React"] -->|"REST / JSON"| API["NestJS API"]
+    Browser <-->|"Socket.IO<br/>authenticated events"| API
+    API --> Auth["Auth and RBAC"]
+    Auth --> DB[("PostgreSQL<br/>Prisma")]
+    API --> Chat["Channel and message services"]
+    Chat --> DB
+```
+
+## Technology
+
+- **Web:** Next.js 14, React 18, TypeScript
+- **API:** NestJS, TypeScript, REST, Socket.IO
+- **Database:** PostgreSQL, Prisma
+- **Workspace:** pnpm monorepo
+- **Local infrastructure:** Docker Compose, PostgreSQL, Redis, MinIO
+
+## Quick start
+
+### Requirements
+
+- Node.js 18 or newer
+- pnpm 8 or newer
+- Docker with the Docker Compose plugin, or a PostgreSQL server available on
+  `localhost:5432`
+
+### Install and configure
+
 ```bash
 pnpm install
 ```
 
-2. Create the root environment file:
+Create a local environment file:
+
 ```bash
 cp .env.example .env
 ```
 
-For local development, `DATABASE_URL` must contain credentials for the
-PostgreSQL server reachable at `localhost:5432`. For Docker Compose, the
-`CHATLY_DB_USER` and `CHATLY_DB_PASSWORD` values configure both PostgreSQL and
-the API connection; keep them consistent with `DATABASE_URL` for commands run
-from the host.
+Set `DATABASE_URL` to credentials accepted by your local PostgreSQL server.
+For Docker Compose, `CHATLY_DB_USER` and `CHATLY_DB_PASSWORD` configure the
+PostgreSQL container and the API's database URL. Choose your own local
+development password; do not commit `.env`.
 
-3. Start PostgreSQL, Redis, and MinIO:
+> Compose initializes database credentials when it first creates its data
+> volume. Editing `.env` later does not change a role in an existing database.
+> Update the PostgreSQL role with an administrator if its credentials need to
+> change. Do not remove the volume unless you intend to delete its data.
+
+### Start the services
+
+Start PostgreSQL, Redis, and MinIO:
+
 ```bash
 docker compose up -d postgres redis minio
 ```
 
-4. Generate the Prisma client, apply the schema, and seed demo data:
+Generate the database client, create/update the local schema, and add the demo
+workspace and accounts:
+
 ```bash
 pnpm db:generate
 pnpm db:push
 pnpm db:seed
 ```
 
-5. Start the development servers:
+Start the web app and API:
+
 ```bash
 pnpm dev
 ```
 
-- API: http://localhost:3001
-- Web: http://localhost:3000
-- MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
-- Demo sign-in after seeding: `member@chatly.local` / `password123`
+| Service | Address |
+| --- | --- |
+| Chatly web app | http://localhost:3000 |
+| API | http://localhost:3001/api |
+| API health | http://localhost:3001/api/health |
+| PostgreSQL readiness | http://localhost:3001/api/health/ready |
+| MinIO console | http://localhost:9001 |
 
-If PostgreSQL is already installed on the host, it must accept the username
-and password in `DATABASE_URL`; having port 5432 open alone does not confirm
-that the credentials work.
+Seeded demo sign-in:
 
-For a fresh Docker database, Compose initializes the configured role and
-password when it first creates its data volume. Changing `.env` later does not
-change credentials inside an existing PostgreSQL volume; update the database
-role using a PostgreSQL administrator if needed. Do not remove the volume
-unless you intend to delete its data.
+```text
+Email:    member@chatly.local
+Password: password123
+```
 
-REST requests and Socket.IO connections require a valid access token. The
-browser stores access and refresh tokens in session storage; refresh tokens
-are rotated by the API.
+The demo password is for local development only. Do not reuse it in a deployed
+environment.
 
-For a separate web/API deployment, set `NEXT_PUBLIC_API_URL` in `.env` to the
-browser-accessible API base URL (for example, `https://chat-api.example.com/api`)
-before building the web app or running `docker compose up --build`.
+### Run the complete Docker stack
 
-## Test stack with Docker
-
-For a containerized stack, create `.env` from `.env.example` and replace both
-JWT secrets with unique values of at least 32 characters. Then run:
+Copy `.env.example` to `.env`, set unique JWT secrets, and then run:
 
 ```bash
 docker compose up --build
 ```
 
-This starts the API, web app, PostgreSQL, Redis, and MinIO. The API is
-available at `http://localhost:3001/api` and its unauthenticated health check
-is `http://localhost:3001/api/health`.
+The API container applies the Prisma schema and seed data before starting the
+API. The web build uses `NEXT_PUBLIC_API_URL`; change it to the browser-visible
+API address when web and API are deployed separately.
 
-## Project Structure
+## Development commands
 
-See [docs/architecture/project-structure.md](docs/architecture/project-structure.md) for detailed structure.
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Start workspace development servers |
+| `pnpm -r build` | Build all workspace packages |
+| `pnpm -r typecheck` | Type-check all workspace packages |
+| `pnpm -r lint` | Run configured linters |
+| `pnpm --filter @chatly/api test` | Run API unit tests |
+| `pnpm db:generate` | Generate Prisma Client |
+| `pnpm db:push` | Apply the Prisma schema to the configured database |
+| `pnpm db:seed` | Seed demo roles, workspace, channels, and accounts |
 
-## Development
+## Project layout
 
-### Database
-- Generate Prisma client: `pnpm db:generate`
-- Create migration: `pnpm db:migrate`
-- Push schema: `pnpm db:push` 
-- Seed database: `pnpm db:seed`
+```text
+apps/
+  api/                 NestJS API, auth, RBAC, chat, health checks
+  web/                 Next.js Chatly interface
+packages/
+  authorization/       Shared permission definitions
+  database/            Prisma schema, client, and seed script
+docs/
+  api/                 API specification
+  architecture/        Architecture and project structure
+  schema/              Database schema notes
+  roadmap.md           Implemented and planned work
+```
 
-### Testing
-- Run all tests: `pnpm test`
-- Integration tests: See `tests/integration/`
-- Security/RBAC tests: See `tests/security/`
+## Security notes
 
-### Adding Permissions
-1. Add permission to `packages/authorization/src/permissions.ts`
-2. Update seed data in `packages/database/prisma/seed.ts`
-3. Use `@RequirePermissions()` decorator in API endpoints
-
-### Adding Roles
-Roles are stored in the database and system roles are created by the seed
-script. Custom role-management endpoints and an admin UI are not implemented.
-
-## Phase Status
-
-- [x] Authentication foundation, workspace membership, seeded roles, and
-  server-side permission guards
-- [ ] User/role/permission management endpoints and admin UI
-- [x] Phase 2 MVP: Public workspace channels and authenticated real-time messages
-- [ ] Phase 2 remaining: DMs, private-channel administration, message status
-- [ ] Phase 3: File sharing, search
-- [ ] Phase 4: Notifications, admin panel, audit logs
-- [ ] Phase 5: Polish, performance, deployment
+- Local secrets belong in `.env`, which is ignored by Git. Commit only example
+  configuration such as `.env.example`.
+- Use unique JWT secrets of at least 32 characters outside local development.
+- Passwords are hashed with Argon2; refresh tokens are stored as hashes and
+  rotated when refreshed.
+- REST routes and Socket.IO connections require authentication except for
+  explicitly public auth and health routes.
+- Authorization is enforced by API guards; hiding a UI control is not an
+  authorization check.
 
 ## Documentation
-- [Architecture](docs/architecture/overview.md)
-- [Database Schema](docs/schema/database-schema.md)
-- [API Specification](docs/api/api-spec.md)
+
+- [API specification](docs/api/api-spec.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Project structure](docs/architecture/project-structure.md)
+- [Database schema](docs/schema/database-schema.md)
 - [Roadmap](docs/roadmap.md)
