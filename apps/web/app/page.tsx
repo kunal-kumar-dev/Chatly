@@ -22,7 +22,8 @@ type Channel = {
 
 type Message = {
   id: string;
-  channelId: string;
+  channelId: string | null;
+  dmId: string | null;
   author: string;
   initials: string;
   color: string;
@@ -34,6 +35,12 @@ type Member = {
   id: string;
   name: string;
   avatarUrl: string | null;
+};
+
+type DirectConversation = {
+  id: string;
+  workspaceId: string;
+  peer: Member;
 };
 
 type LoginResponse = {
@@ -136,8 +143,11 @@ export default function Home() {
   const [token, setToken] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [directMessages, setDirectMessages] = useState<DirectConversation[]>([]);
+  const [people, setPeople] = useState<Member[]>([]);
   const [activeChannelId, setActiveChannelId] = useState('');
-  const [messagesByChannel, setMessagesByChannel] = useState<Record<string, Message[]>>({});
+  const [activeDmId, setActiveDmId] = useState('');
+  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
   const [members, setMembers] = useState<Member[]>([]);
   const [draft, setDraft] = useState('');
   const [email, setEmail] = useState('');
@@ -153,24 +163,29 @@ export default function Home() {
   const [isSocketAuthenticated, setIsSocketAuthenticated] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [newMessageOpen, setNewMessageOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState('');
   const socketRef = useRef<Socket | null>(null);
 
   const activeChannel = channels.find((channel) => channel.id === activeChannelId);
+  const activeDirectMessage = directMessages.find((conversation) => conversation.id === activeDmId);
+  const activeConversationKey = activeDmId
+    ? `dm:${activeDmId}`
+    : activeChannelId ? `channel:${activeChannelId}` : '';
   const userName = user?.displayName || `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
   const userInitials = userName.split(/\s+/).filter(Boolean).slice(0, 2)
     .map((part) => part[0].toUpperCase()).join('') || 'YO';
   const messages = useMemo(() => {
-    const channelMessages = messagesByChannel[activeChannelId] ?? [];
+    const channelMessages = messagesByConversation[activeConversationKey] ?? [];
     const normalizedSearch = search.trim().toLowerCase();
     return normalizedSearch
       ? channelMessages.filter((message) =>
           `${message.author} ${message.content}`.toLowerCase().includes(normalizedSearch),
         )
       : channelMessages;
-  }, [activeChannelId, messagesByChannel, search]);
+  }, [activeConversationKey, messagesByConversation, search]);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,15 +207,21 @@ export default function Home() {
 
     async function restoreSession() {
       try {
-        const [profile, availableChannels] = await Promise.all([
+        const [profile, availableChannels, availableDirectMessages] = await Promise.all([
           apiRequest<User>('/auth/me', sessionToken, {}, setToken),
           apiRequest<Channel[]>('/chat/channels', sessionToken, {}, setToken),
+          apiRequest<DirectConversation[]>('/chat/direct-messages', sessionToken, {}, setToken),
         ]);
         if (cancelled) return;
         setToken(window.sessionStorage.getItem(ACCESS_TOKEN_KEY) ?? sessionToken);
         setUser(profile);
         setChannels(availableChannels);
-        setActiveChannelId(initialChannelId(availableChannels));
+        setDirectMessages(availableDirectMessages);
+        if (availableChannels.length > 0) {
+          setActiveChannelId(initialChannelId(availableChannels));
+        } else if (availableDirectMessages.length > 0) {
+          setActiveDmId(availableDirectMessages[0].id);
+        }
       } catch (error) {
         const refreshToken = window.sessionStorage.getItem(REFRESH_TOKEN_KEY);
         if (!refreshToken) {
@@ -241,9 +262,10 @@ export default function Home() {
       setChatError(error.message || 'Could not join the selected channel.');
     });
     socket.on('chat:message', (message: Message) => {
-      setMessagesByChannel((current) => ({
+      const key = message.dmId ? `dm:${message.dmId}` : `channel:${message.channelId}`;
+      setMessagesByConversation((current) => ({
         ...current,
-        [message.channelId]: mergeMessages(current[message.channelId] ?? [], [message]),
+        [key]: mergeMessages(current[key] ?? [], [message]),
       }));
     });
     return () => {
@@ -254,23 +276,31 @@ export default function Home() {
 
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || !isSocketAuthenticated || !activeChannelId) return;
-    socket.emit('chat:join', { channelId: activeChannelId });
+    if (!socket || !isSocketAuthenticated || (!activeChannelId && !activeDmId)) return;
+    if (activeDmId) socket.emit('dm:join', { dmId: activeDmId });
+    else socket.emit('chat:join', { channelId: activeChannelId });
     return () => {
-      socket.emit('chat:leave', { channelId: activeChannelId });
+      if (activeDmId) socket.emit('dm:leave', { dmId: activeDmId });
+      else socket.emit('chat:leave', { channelId: activeChannelId });
     };
-  }, [activeChannelId, isSocketAuthenticated, token]);
+  }, [activeChannelId, activeDmId, isSocketAuthenticated, token]);
 
   useEffect(() => {
-    if (!token || !activeChannelId) return;
+    if (!token || !activeConversationKey) return;
     let cancelled = false;
     setChatError('');
-    apiRequest<Message[]>(`/chat/channels/${activeChannelId}/messages`, token, {}, setToken)
+    const path = activeDmId
+      ? `/chat/direct-messages/${activeDmId}/messages`
+      : `/chat/channels/${activeChannelId}/messages`;
+    apiRequest<Message[]>(path, token, {}, setToken)
       .then((loadedMessages) => {
         if (!cancelled) {
-          setMessagesByChannel((current) => ({
+          setMessagesByConversation((current) => ({
             ...current,
-            [activeChannelId]: mergeMessages(loadedMessages, current[activeChannelId] ?? []),
+            [activeConversationKey]: mergeMessages(
+              loadedMessages,
+              current[activeConversationKey] ?? [],
+            ),
           }));
         }
       })
@@ -278,10 +308,15 @@ export default function Home() {
         if (!cancelled) setChatError(error.message);
       });
     return () => { cancelled = true; };
-  }, [activeChannelId, token]);
+  }, [activeConversationKey, activeDmId, activeChannelId, token]);
 
   useEffect(() => {
-    if (!token || !activeChannelId || !membersOpen) return;
+    if (!token || !membersOpen) return;
+    if (activeDmId) {
+      setMembers(activeDirectMessage ? [activeDirectMessage.peer] : []);
+      return;
+    }
+    if (!activeChannelId) return;
     let cancelled = false;
     apiRequest<Member[]>(`/chat/channels/${activeChannelId}/members`, token, {}, setToken)
       .then((channelMembers) => {
@@ -291,7 +326,7 @@ export default function Home() {
         if (!cancelled) setChatError(error.message);
       });
     return () => { cancelled = true; };
-  }, [activeChannelId, membersOpen, token]);
+  }, [activeChannelId, activeDmId, activeDirectMessage, membersOpen, token]);
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -313,14 +348,24 @@ export default function Home() {
       }
       window.sessionStorage.setItem(ACCESS_TOKEN_KEY, result.accessToken);
       window.sessionStorage.setItem(REFRESH_TOKEN_KEY, result.refreshToken);
-      const [profile, availableChannels] = await Promise.all([
+      const [profile, availableChannels, availableDirectMessages] = await Promise.all([
         apiRequest<User>('/auth/me', result.accessToken, {}, setToken),
         apiRequest<Channel[]>('/chat/channels', result.accessToken, {}, setToken),
+        apiRequest<DirectConversation[]>('/chat/direct-messages', result.accessToken, {}, setToken),
       ]);
       setToken(window.sessionStorage.getItem(ACCESS_TOKEN_KEY) ?? result.accessToken);
       setUser(profile);
       setChannels(availableChannels);
-      setActiveChannelId(initialChannelId(availableChannels));
+      setDirectMessages(availableDirectMessages);
+      setActiveDmId('');
+      if (availableChannels.length > 0) {
+        setActiveChannelId(initialChannelId(availableChannels));
+      } else if (availableDirectMessages.length > 0) {
+        setActiveChannelId('');
+        setActiveDmId(availableDirectMessages[0].id);
+      } else {
+        setActiveChannelId('');
+      }
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'Unable to sign in');
     } finally {
@@ -358,34 +403,81 @@ export default function Home() {
     setToken('');
     setUser(null);
     setChannels([]);
-    setMessagesByChannel({});
+    setDirectMessages([]);
+    setPeople([]);
+    setMessagesByConversation({});
     setActiveChannelId('');
+    setActiveDmId('');
+    setNewMessageOpen(false);
     setMenuOpen(false);
   }
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = draft.trim();
-    if (!content || !token || !activeChannelId || isSending) return;
+    if (!content || !token || !activeConversationKey || isSending) return;
 
     setIsSending(true);
     setChatError('');
     try {
+      const path = activeDmId
+        ? `/chat/direct-messages/${activeDmId}/messages`
+        : `/chat/channels/${activeChannelId}/messages`;
       const message = await apiRequest<Message>(
-        `/chat/channels/${activeChannelId}/messages`,
+        path,
         token,
         { method: 'POST', body: JSON.stringify({ content }) },
         setToken,
       );
-      setMessagesByChannel((current) => ({
+      setMessagesByConversation((current) => ({
         ...current,
-        [activeChannelId]: mergeMessages(current[activeChannelId] ?? [], [message]),
+        [activeConversationKey]: mergeMessages(
+          current[activeConversationKey] ?? [],
+          [message],
+        ),
       }));
       setDraft('');
     } catch (error) {
       setChatError(error instanceof Error ? error.message : 'Message could not be sent');
     } finally {
       setIsSending(false);
+    }
+  }
+
+  async function openPeoplePicker() {
+    setNewMessageOpen((open) => !open);
+    if (people.length > 0 || !token) return;
+    try {
+      const availablePeople = await apiRequest<Member[]>('/chat/people', token, {}, setToken);
+      setPeople(availablePeople);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : 'Workspace members could not be loaded');
+    }
+  }
+
+  async function startDirectMessage(person: Member) {
+    if (!token) return;
+    setChatError('');
+    try {
+      const conversation = await apiRequest<DirectConversation>(
+        `/chat/direct-messages/${person.id}`,
+        token,
+        { method: 'POST' },
+        setToken,
+      );
+      setDirectMessages((current) => [
+        conversation,
+        ...current.filter((item) => item.id !== conversation.id),
+      ]);
+      setActiveChannelId('');
+      setActiveDmId(conversation.id);
+      setNewMessageOpen(false);
+      setSearch('');
+      setMembersOpen(false);
+      setDetailsOpen(false);
+      setMenuOpen(false);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : 'Could not start direct conversation');
     }
   }
 
@@ -418,7 +510,7 @@ export default function Home() {
             <p className="login-description">A calm, connected place for your team to share ideas, make decisions, and get great work done.</p>
             <div className="login-feature-list">
               <span><i /> Conversations that stay in sync</span>
-              <span><i /> Channels for every team and topic</span>
+              <span><i /> Group channels and private one-to-one chats</span>
               <span><i /> Your workspace, all in one place</span>
             </div>
             <div className="login-brand-foot">Thoughtful teamwork starts with a conversation.</div>
@@ -465,7 +557,7 @@ export default function Home() {
               >{showPassword ? 'Hide' : 'Show'}</button>
             </div>
             <button className="login-submit" type="submit">Sign in <span aria-hidden="true">→</span></button>
-            <p className="login-footnote">Your workspace messages are private to your account.</p>
+            <p className="login-footnote">Sign in to access your group and direct conversations.</p>
             <p className={`service-status ${databaseAvailable === false ? 'unavailable' : ''}`} role="status">
               <i />{databaseAvailable === null ? 'Checking workspace connection…' : databaseAvailable ? 'Workspace services are online' : 'Workspace services are offline'}
             </p>
@@ -492,14 +584,15 @@ export default function Home() {
           <button type="button" aria-label="Workspace menu" title="Workspace menu">⌄</button>
         </div>
 
-        <nav aria-label="Channels">
-          <p className="sidebar-heading">Channels</p>
+        <nav aria-label="Conversations">
+          <p className="sidebar-heading">Group channels</p>
           {channels.map((channel) => (
             <button
-              className={`channel-link ${channel.id === activeChannelId ? 'active' : ''}`}
+              className={`channel-link ${channel.id === activeChannelId && !activeDmId ? 'active' : ''}`}
               key={channel.id}
               onClick={() => {
                 setActiveChannelId(channel.id);
+                setActiveDmId('');
                 window.history.replaceState(null, '', `#${channel.name}`);
                 setSearch('');
                 setMembersOpen(false);
@@ -510,7 +603,52 @@ export default function Home() {
               <span>#</span>{channel.name}
             </button>
           ))}
-          {channels.length === 0 && <p className="sidebar-empty">No channels in this workspace.</p>}
+          {channels.length === 0 && <p className="sidebar-empty">No group channels in this workspace.</p>}
+          <div className="direct-message-heading">
+            <p className="sidebar-heading">Direct messages</p>
+            <button
+              className="new-message-button"
+              type="button"
+              aria-label="Start a direct message"
+              title="Start a direct message"
+              onClick={() => { void openPeoplePicker(); }}
+            >+</button>
+          </div>
+          {directMessages.map((conversation) => (
+            <button
+              className={`channel-link direct-message-link ${conversation.id === activeDmId ? 'active' : ''}`}
+              key={conversation.id}
+              onClick={() => {
+                setActiveChannelId('');
+                setActiveDmId(conversation.id);
+                setSearch('');
+                setMembersOpen(false);
+                setDetailsOpen(false);
+              }}
+              type="button"
+            >
+              <span className="direct-message-presence" />{conversation.peer.name}
+            </button>
+          ))}
+          {directMessages.length === 0 && <p className="sidebar-empty">No direct messages yet.</p>}
+          {newMessageOpen && (
+            <div className="people-picker">
+              <p className="sidebar-heading">Start a conversation</p>
+              {people.map((person) => (
+                <button
+                  className="channel-link"
+                  key={person.id}
+                  onClick={() => { void startDirectMessage(person); }}
+                  type="button"
+                >
+                  <span className="direct-message-presence" />{person.name}
+                </button>
+              ))}
+              {people.length === 0 && (
+                <p className="sidebar-empty">No other active workspace members.</p>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -523,13 +661,21 @@ export default function Home() {
         </div>
       </aside>
 
-      <section className="chat-panel" aria-label={`Channel ${activeChannel?.name ?? ''}`}>
+      <section
+        className="chat-panel"
+        aria-label={activeDirectMessage
+          ? `Direct message with ${activeDirectMessage.peer.name}`
+          : `Channel ${activeChannel?.name ?? ''}`}
+      >
         <header className="chat-header">
           <div>
-            <h1><span>#</span> {activeChannel?.name ?? 'No channel'}</h1>
+            <h1>
+              <span>{activeDirectMessage ? '@' : '#'}</span>{' '}
+              {activeDirectMessage?.peer.name ?? activeChannel?.name ?? 'No conversation selected'}
+            </h1>
             <p>{isConnected ? 'Connected · Messages update in real time' : 'Connecting to realtime chat…'}</p>
           </div>
-          <div className="header-actions" aria-label="Channel actions">
+          <div className="header-actions" aria-label="Conversation actions">
             <button
               type="button"
               aria-label="Search messages"
@@ -541,7 +687,7 @@ export default function Home() {
             >⌕</button>
             <button
               type="button"
-              aria-label="Show channel members"
+              aria-label={activeDirectMessage ? 'Show conversation participant' : 'Show channel members'}
               aria-pressed={membersOpen}
               onClick={() => {
                 setMembersOpen((open) => !open);
@@ -557,12 +703,16 @@ export default function Home() {
               >•••</button>
               {menuOpen && (
                 <div className="options-menu" role="menu">
-                  <button type="button" role="menuitem" onClick={() => {
-                    setDetailsOpen(true);
-                    setMembersOpen(true);
-                    setMenuOpen(false);
-                  }}>Channel details</button>
-                  <button type="button" role="menuitem" onClick={copyChannelLink}>Copy channel link</button>
+                  {activeChannel && (
+                    <>
+                      <button type="button" role="menuitem" onClick={() => {
+                        setDetailsOpen(true);
+                        setMembersOpen(true);
+                        setMenuOpen(false);
+                      }}>Channel details</button>
+                      <button type="button" role="menuitem" onClick={copyChannelLink}>Copy channel link</button>
+                    </>
+                  )}
                   <button type="button" role="menuitem" onClick={signOut}>Sign out</button>
                 </div>
               )}
@@ -576,7 +726,7 @@ export default function Home() {
             <input
               autoFocus
               aria-label="Search this channel"
-              placeholder={`Search #${activeChannel?.name ?? ''}`}
+              placeholder={`Search ${activeDirectMessage ? activeDirectMessage.peer.name : `#${activeChannel?.name ?? ''}`}`}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -593,14 +743,23 @@ export default function Home() {
               <span className={isConnected ? 'connection-dot connected' : 'connection-dot'} />
               {isConnected ? 'Live updates are on' : 'Reconnecting to live updates'}
               {activeChannel && <span className="channel-description">{activeChannel.description}</span>}
+              {activeDirectMessage && (
+                <span className="channel-description">Private one-to-one conversation</span>
+              )}
             </div>
 
             <div className="message-list" aria-live="polite">
               {messages.length === 0 ? (
                 <div className="empty-state">
                   <div>✦</div>
-                  <h2>{search ? 'No matching messages' : 'This channel is quiet'}</h2>
-                  <p>{search ? 'Try a different search.' : `Start the conversation in #${activeChannel?.name ?? ''}.`}</p>
+                  <h2>{search ? 'No matching messages' : activeConversationKey ? 'No messages yet' : 'Choose a conversation'}</h2>
+                  <p>{search
+                    ? 'Try a different search.'
+                    : activeDirectMessage
+                      ? `Start a private conversation with ${activeDirectMessage.peer.name}.`
+                      : activeChannel
+                        ? `Start the group conversation in #${activeChannel.name}.`
+                        : 'Choose a group channel or start a direct message.'}</p>
                 </div>
               ) : (
                 messages.map((message) => (
@@ -619,37 +778,45 @@ export default function Home() {
             </div>
 
             <form className="composer" onSubmit={sendMessage}>
-              <label className="sr-only" htmlFor="message">Message #{activeChannel?.name ?? ''}</label>
+              <label className="sr-only" htmlFor="message">
+                {activeDirectMessage
+                  ? `Message ${activeDirectMessage.peer.name}`
+                  : `Message #${activeChannel?.name ?? ''}`}
+              </label>
               <input
                 id="message"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder={activeChannel ? `Message #${activeChannel.name}` : 'Select a channel'}
+                placeholder={activeDirectMessage
+                  ? `Message ${activeDirectMessage.peer.name}`
+                  : activeChannel ? `Message #${activeChannel.name}` : 'Select a conversation'}
                 autoComplete="off"
                 maxLength={4000}
-                disabled={!activeChannel || isSending}
+                disabled={!activeConversationKey || isSending}
               />
               <button
                 type="submit"
-                disabled={!draft.trim() || !activeChannel || isSending}
+                disabled={!draft.trim() || !activeConversationKey || isSending}
                 aria-label="Send message"
               >↑</button>
             </form>
           </div>
 
           {membersOpen && (
-            <aside className="members-panel" aria-label={detailsOpen ? 'Channel details' : 'Channel members'}>
+            <aside className="members-panel" aria-label={detailsOpen ? 'Channel details' : 'Conversation participants'}>
               <div className="members-heading">
                 <div>
-                  <strong>{detailsOpen ? 'Channel details' : 'Members'}</strong>
-                  <span>{detailsOpen ? `#${activeChannel?.name ?? ''}` : `${members.length} people`}</span>
+                  <strong>{detailsOpen ? 'Channel details' : activeDirectMessage ? 'Conversation' : 'Members'}</strong>
+                  <span>{detailsOpen
+                    ? `#${activeChannel?.name ?? ''}`
+                    : activeDirectMessage ? 'One-to-one chat' : `${members.length} people`}</span>
                 </div>
                 <button type="button" aria-label="Close members panel" onClick={() => {
                   setMembersOpen(false);
                   setDetailsOpen(false);
                 }}>×</button>
               </div>
-              {detailsOpen && (
+              {detailsOpen && activeChannel && (
                 <div className="channel-details">
                   <span className="detail-hash">#</span>
                   <h2>{activeChannel?.name}</h2>

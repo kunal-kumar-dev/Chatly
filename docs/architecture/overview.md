@@ -66,6 +66,7 @@ graph TB
 
 ### Messaging
 - **Message Service**: CRUD operations for messages with threading support
+- **Current MVP**: Persistent group-channel messages and participant-authorized one-to-one DMs with REST and Socket.IO delivery
 - **Thread Support**: Replies create threads with parent message references
 - **Message Actions**: Edit, delete (soft delete with scope), forward, pin, star, reactions
 - **Mentions**: @mention parsing and notification triggering

@@ -3,8 +3,9 @@
 **A focused team chat for work that moves forward.**
 
 Chatly is a workspace-based team messaging application. The current MVP
-includes account authentication, workspace channels, persistent messages,
-real-time channel updates, and server-side channel access checks.
+includes account authentication, group channels, private one-to-one
+conversations, persistent messages, real-time updates, and server-side access
+checks.
 
 ![Illustrative preview of the Chatly channel interface](docs/images/chatly-overview.svg)
 
@@ -20,8 +21,8 @@ real-time channel updates, and server-side channel access checks.
 | Sessions | Short-lived JWT access tokens and rotating refresh tokens |
 | Workspaces | Demo workspace membership and seeded system roles |
 | Channels | Public channel listing; access checks for private channels a user is already in |
-| Messages | Persistent channel history, latest 100 messages, real-time delivery |
-| Discovery | Client-side filter over messages already loaded in the active channel |
+| Messages | Persistent group-channel and one-to-one DM history; latest 100 per conversation; real-time delivery |
+| Discovery | Start a DM with an active workspace member; filter messages already loaded in the active conversation |
 | Authorization | Server-side NestJS guards and database-backed permissions |
 
 ## What works
@@ -29,8 +30,9 @@ real-time channel updates, and server-side channel access checks.
 - Register and sign in with email and password.
 - Restore the browser session, refresh expired access tokens, and sign out.
 - Load workspace channels the signed-in user is allowed to access.
-- Read the latest 100 messages in a channel and send new messages.
-- Receive live messages from authenticated users in the same channel.
+- Read the latest 100 messages in a group channel or one-to-one conversation and send messages.
+- Start or reopen a private conversation with another active member of a shared workspace.
+- Receive live channel messages and private DM updates; only conversation participants can access a DM.
 - View channel members and details, filter the loaded messages, and copy a
   channel link that opens the selected channel.
 - Check API availability at `/api/health` and PostgreSQL readiness at
@@ -38,7 +40,8 @@ real-time channel updates, and server-side channel access checks.
 
 ### Current limitations
 
-- Direct and group messages are not implemented.
+- Group messaging is provided by channels; group direct-message conversations
+  are not implemented.
 - Creating private channels and managing their membership are not implemented.
 - Search only filters the messages currently loaded in the selected channel;
   it is not a server-side or full-history search.
@@ -59,7 +62,7 @@ flowchart LR
     Browser <-->|"Socket.IO<br/>authenticated events"| API
     API --> Auth["Auth and RBAC"]
     Auth --> DB[("PostgreSQL<br/>Prisma")]
-    API --> Chat["Channel and message services"]
+    API --> Chat["Channel, DM, and message services"]
     Chat --> DB
 ```
 

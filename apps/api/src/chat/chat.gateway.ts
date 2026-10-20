@@ -80,6 +80,25 @@ export class ChatGateway implements OnGatewayConnection {
     }
   }
 
+  @SubscribeMessage('dm:join')
+  async joinDirectMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { dmId?: string },
+  ): Promise<void> {
+    if (!client.data.userId || !body?.dmId) {
+      client.emit('chat:error', { message: 'A valid direct conversation is required' });
+      return;
+    }
+
+    try {
+      await this.chatService.ensureDirectMessageAccess(client.data.userId, body.dmId);
+      await client.join(`dm:${body.dmId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to join conversation';
+      client.emit('chat:error', { message });
+    }
+  }
+
   @SubscribeMessage('chat:leave')
   leaveChannel(
     @ConnectedSocket() client: Socket,
@@ -90,8 +109,19 @@ export class ChatGateway implements OnGatewayConnection {
     }
   }
 
+  @SubscribeMessage('dm:leave')
+  leaveDirectMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { dmId?: string },
+  ): void {
+    if (body?.dmId) {
+      void client.leave(`dm:${body.dmId}`);
+    }
+  }
+
   publishMessage(message: ChatMessage): void {
-    this.server.to(message.channelId).emit('chat:message', message);
+    const room = message.dmId ? `dm:${message.dmId}` : message.channelId;
+    if (room) this.server.to(room).emit('chat:message', message);
   }
 
   private accessToken(client: Socket): string | undefined {

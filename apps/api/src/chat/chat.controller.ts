@@ -16,6 +16,44 @@ export class ChatController {
     return this.chatService.listChannels(userId);
   }
 
+  @Get('people')
+  listPeople(@CurrentUser('id') userId: string) {
+    return this.chatService.listPeople(userId);
+  }
+
+  @Get('direct-messages')
+  listDirectMessages(@CurrentUser('id') userId: string) {
+    return this.chatService.listDirectMessages(userId);
+  }
+
+  @Post('direct-messages/:recipientId')
+  getOrCreateDirectMessage(
+    @CurrentUser('id') userId: string,
+    @Param('recipientId') recipientId: string,
+  ) {
+    return this.chatService.getOrCreateDirectMessage(userId, recipientId);
+  }
+
+  @Get('direct-messages/:dmId/messages')
+  listDirectMessageMessages(
+    @CurrentUser('id') userId: string,
+    @Param('dmId') dmId: string,
+  ) {
+    return this.chatService.listDirectMessageMessages(userId, dmId);
+  }
+
+  @Post('direct-messages/:dmId/messages')
+  createDirectMessage(
+    @CurrentUser('id') userId: string,
+    @Param('dmId') dmId: string,
+    @Body() dto: SendMessageDto,
+  ) {
+    return this.chatService.createDirectMessage(userId, dmId, dto).then((message) => {
+      this.chatGateway.publishMessage(message);
+      return message;
+    });
+  }
+
   @Get('channels/:channelId/messages')
   listMessages(
     @CurrentUser('id') userId: string,

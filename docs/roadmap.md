@@ -14,15 +14,16 @@
 
 ## Phase 2: Channels, DMs, real-time messaging, message status ticks
 - [x] Public workspace channels and channel member listing
+- [x] Group conversations through channels
 - [ ] Private channel management and membership administration
-- [ ] Direct messages (1:1)
-- [x] Authenticated Socket.IO gateway with channel rooms
-- [x] Persistent channel messages with real-time delivery
-- [x] Chat UI sign-in, channel history, search, member list, and channel options
+- [x] One-to-one direct messages between active members of a shared workspace
+- [x] Authenticated Socket.IO gateway with channel and participant-authorized DM rooms
+- [x] Persistent channel and direct messages with real-time delivery
+- [x] Chat UI sign-in, group and DM history, search, member list, and conversation options
 - [ ] Typing indicators
 - [ ] Online/offline presence (Redis)
 - [ ] Message status ticks (sent/delivered/read)
-- [ ] Group read receipts with "Seen by" 
+- [ ] Group read receipts with "Seen by"
 - [ ] Admin setting for read receipts visibility
 
 ## Phase 3: File and image sharing, search

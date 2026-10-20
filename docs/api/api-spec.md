@@ -10,13 +10,21 @@
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
 | GET | `/chat/channels` | List accessible, unarchived workspace channels | Yes |
+| GET | `/chat/people` | List active members of the signed-in user's workspaces | Yes |
+| GET | `/chat/direct-messages` | List the user's one-to-one conversations | Yes |
+| POST | `/chat/direct-messages/:recipientId` | Create or reopen a one-to-one conversation with a shared workspace member | Yes |
 | GET | `/chat/channels/:channelId/messages` | Get the latest 100 messages in a channel | Yes |
 | POST | `/chat/channels/:channelId/messages` | Persist and broadcast a text message (`content`, max 4000 chars) | Yes |
 | GET | `/chat/channels/:channelId/members` | List channel members | Yes |
+| GET | `/chat/direct-messages/:dmId/messages` | Get the latest 100 messages in a DM | Yes, participant |
+| POST | `/chat/direct-messages/:dmId/messages` | Persist and broadcast a text message in a DM | Yes, participant |
 
 Public channels are visible to active workspace members; private channels
 require channel membership. Messages are broadcast only to authorized members
-who have joined the channel socket room.
+who have joined the channel socket room. Group conversations use channels.
+Direct conversations are one-to-one and can only be started with an active
+member of a shared workspace; REST routes and socket rooms verify participant
+access.
 
 ### Authentication
 | Method | Endpoint | Description | Auth Required | Permissions |
@@ -177,8 +185,8 @@ who have joined the channel socket room.
 | `chat:ready` | Server->Client | Socket access token accepted | Yes |
 | `chat:join` | Client->Server | Join a channel room (`{ channelId }`) | Yes, channel access |
 | `chat:leave` | Client->Server | Leave a channel room (`{ channelId }`) | Yes |
-| `chat:message` | Server->Client | Persisted channel message broadcast | Yes (room member) |
-| `chat:error` | Server->Client | Authentication or channel error | - |
+| `chat:message` | Server->Client | Persisted channel or direct message broadcast | Yes (room member) |
+| `chat:error` | Server->Client | Authentication, channel, or DM error | - |
 | `message:send` | Client->Server | Send new message | Yes, `message.send` |
 | `message:sent` | Server->Client | Message sent confirmation | Yes |
 | `message:new` | Server->Client | New message broadcast | Yes (room member) |
@@ -214,7 +222,8 @@ who have joined the channel socket room.
 | `channel:join` | Client->Server | Join channel room | Yes |
 | `channel:leave` | Client->Server | Leave channel room | Yes |
 | `channel:update` | Server->Client | Channel updated broadcast | Yes (member) |
-| `dm:join` | Client->Server | Join DM room | Yes (participant) |
+| `dm:join` | Client->Server | Join DM room (`{ dmId }`) | Yes (participant) |
+| `dm:leave` | Client->Server | Leave DM room (`{ dmId }`) | Yes |
 
 ### Notifications
 | Event | Direction | Description | Auth Required |

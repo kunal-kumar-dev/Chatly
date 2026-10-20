@@ -187,7 +187,8 @@ Table channel_members {
 ```
 
 ### Direct Messages (DMs)
-1:1 conversations.
+One-to-one conversations between two members of a shared workspace. Group
+conversations use channels.
 
 ```sql
 Table dms {
