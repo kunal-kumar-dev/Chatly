@@ -2,7 +2,7 @@
   "name": "chatly",
   "version": "1.0.0",
   "private": true,
-  "description": "Secure company team-chat application with RBAC",
+  "description": "Open-source team chat workspace for channels and private conversations",
   "workspaces": [
     "apps/*",
     "packages/*"
