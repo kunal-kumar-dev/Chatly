@@ -85,7 +85,13 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!storedToken || storedToken.revokedAt || storedToken.expiresAt < new Date()) {
+    if (
+      !storedToken
+      || storedToken.revokedAt
+      || storedToken.expiresAt < new Date()
+      || !storedToken.user.isActive
+      || storedToken.user.deletedAt
+    ) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 

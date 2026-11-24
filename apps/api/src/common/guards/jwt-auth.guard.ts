@@ -70,7 +70,7 @@ export class JwtAuthGuard implements CanActivate {
       },
     });
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.deletedAt) {
       throw new UnauthorizedException('Invalid user');
     }
 

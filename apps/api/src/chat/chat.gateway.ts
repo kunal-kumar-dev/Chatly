@@ -44,10 +44,10 @@ export class ChatGateway implements OnGatewayConnection {
       });
       const user = await prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, isActive: true },
+        select: { id: true, isActive: true, deletedAt: true },
       });
 
-      if (!user?.isActive) {
+      if (!user?.isActive || user.deletedAt) {
         client.emit('chat:error', { message: 'Authentication required' });
         client.disconnect();
         return;
