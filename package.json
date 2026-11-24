@@ -1,6 +1,6 @@
 {
   "name": "chatly",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Secure company team-chat application with RBAC",
   "workspaces": [

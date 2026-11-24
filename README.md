@@ -2,10 +2,21 @@
 
 **A focused team chat for work that moves forward.**
 
-Chatly is a workspace-based team messaging application. The current MVP
-includes account authentication, group channels, private one-to-one
-conversations, persistent messages, real-time updates, and server-side access
-checks.
+## About
+
+Chatly is an open-source, workspace-based team messaging application built for
+focused collaboration. It includes account authentication, public channels,
+private one-to-one conversations, persistent message history, and real-time
+Socket.IO updates with server-side authorization.
+
+The project is a TypeScript monorepo using Next.js and React on the web, NestJS
+on the API, PostgreSQL and Prisma for persistence, and Docker for local
+development infrastructure.
+
+> Current release: **1.0.0**
+
+Chatly is provided for learning and self-hosted development. Features marked as
+planned in the roadmap are not included in this release.
 
 ![Illustrative preview of the Chatly channel interface](docs/images/chatly-overview.svg)
 
@@ -53,6 +64,10 @@ checks.
   into the MVP's messaging features.
 
 See the [roadmap](docs/roadmap.md) for planned work.
+
+## License
+
+Chatly is released under the [MIT License](LICENSE).
 
 ## Architecture
 
